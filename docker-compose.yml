@@ -1,0 +1,28 @@
+services:
+  app:
+    image: cosmos-faucet:latest
+    container_name: cosmos-faucet
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - COSMOS_FAUCET_PORT=5000
+      #- COSMOS_FAUCET_HOST=0.0.0.0
+      - COSMOS_FAUCET_DB_PATH=/db/faucet.db
+      - COSMOS_FAUCET_PROJECT_NAME=Cosmos SDK Blockchain Faucet For BZLAB
+      #- COSMOS_FAUCET_PROJECT_DESCRIPTION="Uniform Faucet Tool For Cosmos SDK Blockchains - Powered By Ping.pub"
+      - COSMOS_FAUCET_PROJECT_LOGO=https://tubitak.gov.tr/sites/default/files/2023-08/logo.svg
+      - COSMOS_FAUCET_PROJECT_DEPLOYER=<a href="https://blokzincir.bilgem.tubitak.gov.tr/">BZLAB</a>
+      - COSMOS_FAUCET_BLOCKCHAIN_RPCENDPOINT=https://rpc.sentry-02.theta-testnet.polypore.xyz
+      - COSMOS_FAUCET_SENDER_MNEMONIC=surround miss nominee dream gap cross assault thank captain prosper drop duty group candy wealth weather scale put
+      - COSMOS_FAUCET_SENDER_OPTION_PREFIX=cosmos
+      - COSMOS_FAUCET_TX_AMOUNT_DENOM=uatom
+      - COSMOS_FAUCET_TX_AMOUNT_AMOUNT=10000
+      - COSMOS_FAUCET_TX_FEE_AMOUNT_AMOUNT=1000
+      - COSMOS_FAUCET_TX_FEE_AMOUNT_DENOM=uatom
+      - COSMOS_FAUCET_TX_FEE_GAS=200000
+      - COSMOS_FAUCET_LIMIT_HOURS=24
+      - COSMOS_FAUCET_LIMIT_ADDRESS=1
+      - COSMOS_FAUCET_LIMIT_IP=10
+    volumes:
+      - ./faucet-db:/db
