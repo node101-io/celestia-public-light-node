@@ -1,7 +1,7 @@
 import {
   checkIPAndWalletAddressLimit,
   updateRateLimitHistory,
-} from '../../../../utils/checker.js';
+} from '../../../../utils/rateLimitChecker.js';
 import sendToken from '../../../../utils/sendToken.js';
 
 export default (req, res) => {
