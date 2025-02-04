@@ -1,10 +1,9 @@
-const appconfig = require("../config");
-const config = appconfig.InitConfig();
+import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
+import { SigningStargateClient } from '@cosmjs/stargate';
 
-const { DirectSecp256k1HdWallet } = require("@cosmjs/proto-signing");
-const { SigningStargateClient } = require("@cosmjs/stargate");
+import config from '../config.js';
 
-module.exports = (recipient, callback) => {
+export default (recipient, callback) => {
   DirectSecp256k1HdWallet.fromMnemonic(config.sender.mnemonic, {
     prefix: config.sender.option.prefix,
   })

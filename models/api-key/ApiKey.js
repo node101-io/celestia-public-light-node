@@ -1,81 +1,91 @@
 import mongoose from 'mongoose';
 import validator from 'validator';
+import { v4 as createUuid } from 'uuid';
 
-const DUPLICATED_UNIQUE_FIELD_ERROR_CODE = 11000;
-const MAX_DATABASE_TEXT_FIELD_LENGTH = 1e4;
-
-const Schema = mongoose.Schema;
-
-const ApiKeySchema = new Schema({
+const ApiKeySchema = new mongoose.Schema({
   key: {
     type: String,
     required: true,
     unique: true
   },
-  is_deleted: {
-    type: Boolean,
-    default: false
+  team_name: {
+    type: String,
+    required: true,
+    unique: true
   }
 });
 
 ApiKeySchema.statics.createApiKey = function (data, callback) {
-  const ApiKey = this;
-
   if (!data || typeof data !== 'object')
     return callback('bad_request');
 
-  if (!data.key || typeof data.key !== 'string' || !data.key.trim().length || data.key.trim().length > MAX_DATABASE_TEXT_FIELD_LENGTH)
+  if (!data.team_name || !validator.isAlphanumeric(data.team_name.toString()))
     return callback('bad_request');
 
-  const newApiKey = new ApiKey({ key: data.key.trim() });
+  const api_key = createUuid();
 
-  newApiKey.save((err, apiKey) => {
-    if (err && err.code === DUPLICATED_UNIQUE_FIELD_ERROR_CODE)
-      return callback('duplicated_unique_field');
-
-    if (err)
+  ApiKey.create({
+    key: api_key,
+    team_name: data.team_name.toString()
+  })
+    .then(apiKey => callback(null, apiKey))
+    .catch(err => {
+      console.error(err);
       return callback('database_error');
-
-    return callback(null, apiKey._id.toString());
-  });
+    });
 };
 
 ApiKeySchema.statics.findApiKeyById = function (id, callback) {
-  const ApiKey = this;
-
   if (!id || !validator.isMongoId(id.toString()))
     return callback('bad_request');
 
-  ApiKey.findById(mongoose.Types.ObjectId(id.toString()), (err, apiKey) => {
-    if (err)
-      return callback('database_error');
+  ApiKey.findById(mongoose.Types.ObjectId(id.toString()))
+    .then(apiKey => {
+      if (!apiKey)
+        return callback('document_not_found');
 
-    if (!apiKey)
-      return callback('document_not_found');
+      return callback(null, apiKey);
+    })
+    .catch(err => {
+      console.error(err);
+      return callback('database_error')
+    });
+};
 
-    return callback(null, apiKey);
-  });
+ApiKeySchema.statics.findApiKeysByFilters = function (data, callback) {
+  if (!data || typeof data !== 'object')
+    return callback('bad_request');
+
+  const filter = {};
+
+  if (data.key)
+    filter.key = data.key.toString();
+
+  ApiKey.findOne(filter)
+    .then(apiKey => {
+      if (!apiKey)
+        return callback('document_not_found');
+
+      return callback(null, apiKey);
+    })
+    .catch(err => {
+      console.error(err);
+      return callback('database_error')
+    });
 };
 
 ApiKeySchema.statics.findApiKeyByIdAndDelete = function (id, callback) {
-  const ApiKey = this;
+  ApiKey.findByIdAndDelete(mongoose.Types.ObjectId(id.toString()))
+    .then(apiKey => {
+      if (!apiKey)
+        return callback('document_not_found');
 
-  ApiKey.findApiKeyById(id, (err, apiKey) => {
-    if (err)
-      return callback(err);
-
-    if (apiKey.is_deleted)
-      return callback(null);
-
-    ApiKey.findByIdAndUpdate(apiKey._id, { $set: {
-      is_deleted: true
-    }}, (err) => {
-      if (err)
-        return callback('database_error');
-
-      return callback(null);
+      return callback(null, apiKey);
+    })
+    .catch(err => {
+      console.error(err);
+      return callback('database_error')
     });
-  });
 };
 
-export default mongoose.model('ApiKey', ApiKeySchema);
+export const ApiKey = mongoose.model('ApiKey', ApiKeySchema);

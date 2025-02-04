@@ -1,4 +1,8 @@
 db
-node_modules
 .env
 .DS_Store
+.turbo
+node_modules
+*.tsbuildinfo
+.vscode
+.prettierrc

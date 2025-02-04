@@ -1,61 +1,37 @@
-const express = require("express");
-const path = require("path");
+import 'dotenv/config';
 
-const frequencyChecker = require("./utils/checker");
-const sendToken = require("./utils/sendToken");
+import express from 'express';
+import mongoose from 'mongoose';
 
-const { InitConfig } = require("./config");
+import config from './config.js';
+
+import isAuthenticated from './middlewares/isAuthenticated.js';
+
+import faucetIndexGetController from './controllers/faucet/index/get.js';
+import faucetSendGetController from './controllers/faucet/send/[address]/get.js';
+import createWalletPostController from './controllers/create-wallet/post.js';
+import rpcPostController from './controllers/rpc/post.js';
+
+await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/celestia');
 
 const app = express();
 
-const appconfig = InitConfig();
-const PORT = appconfig.port || 3000;
+const PORT = config.port || 3000;
 
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'pug');
+app.use(express.json());
 
-app.use(express.static(path.join(__dirname, 'public')));
-// app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
+app.get('/faucet', faucetIndexGetController);
+app.get('/faucet/send/:address', faucetSendGetController);
 
-const faucetIndexController = require('./routes/indexRoute');
-app.use('/', faucetIndexController);
+app.post('/create-wallet',
+  isAuthenticated,
+  createWalletPostController
+);
 
-app.get("/config", (req, res) => {
-  return res.send({
-    ...appconfig.project,
-    prefix: appconfig.sender.option.prefix,
-  });
-});
-
-app.get("/send/:address", (req, res) => {
-  const address = req.params.address;
-
-  if (!address || typeof address !== "string" || !address.trim().length)
-    return res.send({ result: "address is required" });
-
-  if (!address.startsWith(appconfig.sender.option.prefix))
-    return res.send({ result: `Address [${address}] is not supported.` });
-
-  frequencyChecker.checkIPAndWalletAddressLimit(req.ip, address, (err) => {
-    if (err) return res.send({ result: "You requested too often" });
-
-    frequencyChecker.update(req.ip, (err, result) => {
-      if (err) return res.send({ result: "Failed, Please contact to admin." });
-
-      sendToken(address, (err, result) => {
-        console.log(err, result);
-        if (err) return res.send({ result: "Failed, Please contact to admin." });
-
-        frequencyChecker.update(address, (err, ret) => {
-          if (err)
-            return res.send({ result: "Failed, Please contact to admin." });
-
-          return res.send({ result: ret });
-        });
-      });
-    });
-  });
-});
+app.use('/rpc',
+  isAuthenticated,
+  rpcPostController
+);
 
 app.listen(PORT, () => {
   console.log(`Faucet app listening on port ${PORT}`);

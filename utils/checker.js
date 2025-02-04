@@ -1,8 +1,6 @@
-const { Level } = require("level");
+import { Level } from 'level';
 
-const appconfig = require("../config");
-
-const config = appconfig.InitConfig();
+import config from '../config.js';
 
 const LIMIT_TIME = config.limit.hours * 60 * 60 * 1000;
 
@@ -12,34 +10,32 @@ function isUnderLimit(value, limit) {
   );
 }
 
-const db = new Level(config.db.path, { valueEncoding: "json" });
+const db = new Level(config.db.path, { valueEncoding: 'json' });
 
-module.exports = {
-  checkIPAndWalletAddressLimit(ip, address, callback) {
-    console.log("checkIPAndWalletAddressLimit");
-    db.get(ip, (err, ip_history) => {
-      if (!err && !isUnderLimit(ip_history, config.limit.ip))
-        return callback("You requested too often");
-      console.log(ip_history);
-      db.get(address, (err, address_history) => {
-        if (!err && !isUnderLimit(address_history, config.limit.address))
-          return callback("You requested too often");
+export function checkIPAndWalletAddressLimit(ip, address, callback) {
+  db.get(ip, (err, ip_history) => {
+    if (!err && !isUnderLimit(ip_history, config.limit.ip))
+      return callback('You requested too often');
 
-        return callback(null);
-      });
+    db.get(address, (err, address_history) => {
+      if (!err && !isUnderLimit(address_history, config.limit.address))
+        return callback('You requested too often');
+
+      return callback(null);
     });
-  },
-  update(key, callback) {
-    db.get(key, (err, history) => {
-      if (!history || !Array.isArray(history)) history = [];
+  });
+};
 
-      history.push(Date.now());
+export function updateRateLimitHistory(key, callback) {
+  db.get(key, (err, history) => {
+    if (!history || !Array.isArray(history)) history = [];
 
-      db.put(key, history, (err, result) => {
-        if (err) return callback(err);
+    history.push(Date.now());
 
-        return callback(null, result);
-      });
+    db.put(key, history, (err, result) => {
+      if (err) return callback(err);
+
+      return callback(null, result);
     });
-  },
+  });
 };

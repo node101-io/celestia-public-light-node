@@ -1,34 +1,27 @@
 {
   "name": "faucet",
   "version": "1.0.0",
-  "description": "Faucet for Cosmos-SDK blockchains",
+  "type": "module",
+  "description": "Faucet for Celestia Testnet",
   "main": "app.js",
   "scripts": {
+    "dev": "nodemon app.js",
     "start": "node app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "create-api-key": "node utils/create-api-key.js"
   },
-  "repository": {
-    "type": "git",
-    "url": ""
-  },
-  "keywords": [
-    "Faucet",
-    "Cosmos",
-    "SDK",
-    "blockchain"
-  ],
-  "author": "Ping",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/ping-pub/faucet/issues"
-  },
-  "homepage": "",
   "dependencies": {
     "@cosmjs/crypto": "^0.32.4",
     "@cosmjs/proto-signing": "^0.32.4",
     "@cosmjs/stargate": "^0.32.4",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "level": "^8.0.1"
+    "http-proxy-middleware": "^3.0.3",
+    "level": "^8.0.1",
+    "mongoose": "^8.9.6",
+    "uuid": "^11.0.5",
+    "validator": "^13.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
   }
 }
