@@ -35,7 +35,7 @@ export default {
   },
   limit: {
     hours: 24,
-    address: 10,
+    address: 1,
     ip: 10,
   }
 };

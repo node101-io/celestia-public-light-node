@@ -12,7 +12,7 @@ import faucetSendGetController from './controllers/faucet/send/[address]/get.js'
 import createWalletPostController from './controllers/create-wallet/post.js';
 import rpcPostController from './controllers/rpc/post.js';
 
-await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/celestia');
+await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/celestia');
 
 const app = express();
 
