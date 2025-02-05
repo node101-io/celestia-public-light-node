@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import validator from 'validator';
 
+import { ApiKey } from '../api-key/ApiKey.js';
+
 import { createWalletInLightNode } from './functions/createWalletInLightNode.js';
 
 const MAX_WALLET_PER_API_KEY = 3;
@@ -25,36 +27,47 @@ WalletSchema.statics.createWallet = function (data, callback) {
   if (!data || typeof data !== 'object')
     return callback('bad_request');
 
-  if (!data.api_key || !validator.isMongoId(data.api_key.toString()))
+  if (!data.api_key || typeof data.api_key !== 'string' || !validator.isUUID(data.api_key))
     return callback('bad_request');
 
-  Wallet.find({
-    api_key: data.api_key.toString()
-  })
-    .then(wallet_count => {
-      if (wallet_count > MAX_WALLET_PER_API_KEY)
-        return callback('max_wallet_count');
+  ApiKey.findApiKeysByFilters({
+    key: data.api_key
+  }, (err, apiKey) => {
+    if (err)
+      return callback(err);
 
-      createWalletInLightNode((err, wallet) => {
-        if (err)
-          return callback(err);
-
-        Wallet.create({
-          api_key: data.api_key,
-          address: wallet.address,
-          mnemonic: wallet.mnemonic
-        })
-          .then(wallet => callback(null, wallet._id.toString()))
-          .catch(err => {
-            console.error(err);
-            return callback('database_error');
-          });
-      });
+    Wallet.countDocuments({
+      api_key: apiKey._id
     })
-    .catch(err => {
-      console.error(err);
-      return callback('database_error');
-    });
+      .then(wallet_count => {
+        if (wallet_count >= MAX_WALLET_PER_API_KEY)
+          return callback('max_wallet_count');
+
+        const walletName = apiKey.team_name + Date.now();
+
+        createWalletInLightNode({
+          wallet_name: walletName
+        }, (err, wallet) => {
+          if (err)
+            return callback(err);
+
+          Wallet.create({
+            api_key: apiKey._id,
+            address: wallet.address,
+            mnemonic: wallet.mnemonic
+          })
+            .then(wallet => callback(null, wallet))
+            .catch(err => {
+              console.error(err);
+              return callback('database_error');
+            });
+        });
+      })
+      .catch(err => {
+        console.error(err);
+        return callback('database_error');
+      });
+  });
 };
 
 export const Wallet = mongoose.model('Wallet', WalletSchema);
