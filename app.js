@@ -7,8 +7,10 @@ import config from './config.js';
 
 import isAuthenticated from './middlewares/isAuthenticated.js';
 
+import configGetController from './controllers/config/get.js';
 import faucetIndexGetController from './controllers/faucet/index/get.js';
 import faucetSendGetController from './controllers/faucet/send/[address]/get.js';
+
 import createWalletPostController from './controllers/create-wallet/post.js';
 import rpcPostController from './controllers/rpc/post.js';
 
@@ -20,22 +22,23 @@ const PORT = config.port || 3000;
 
 app.use(express.json());
 
-app.get('/faucet', faucetIndexGetController);
-app.get('/faucet/send/:address', faucetSendGetController);
+app.use(express.static('public'));
 
-app.get("/config", (req, res) => {
-  return res.send({
-    ...config.project,
-    prefix: config.sender.option.prefix,
-  });
-});
+app.get('/faucet',
+  faucetIndexGetController
+);
+app.get('/faucet/send/:address',
+  faucetSendGetController
+);
+app.get('/config',
+  configGetController
+);
 
 app.post('/create-wallet',
   isAuthenticated,
   createWalletPostController
 );
-
-app.use('/rpc',
+app.post('/rpc',
   isAuthenticated,
   rpcPostController
 );

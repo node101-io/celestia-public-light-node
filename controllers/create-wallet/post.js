@@ -1,6 +1,8 @@
 import { Wallet } from '../../models/wallet/Wallet.js';
 
 export default (req, res) => {
+  console.log('POST /create-wallet', req.headers['x-api-key']);
+
   Wallet.createWallet({
     api_key: req.headers['x-api-key']
   }, (err, wallet) => {

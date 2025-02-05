@@ -6,6 +6,8 @@ import {
 import sendToken from '../../../../utils/sendToken.js';
 
 export default (req, res) => {
+  console.log('GET /faucet/send/:address', req.params.address);
+
   const address = req.params.address;
 
   if (!address || typeof address !== 'string' || !address.trim().length)

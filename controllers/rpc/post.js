@@ -9,6 +9,8 @@ if (!process.env.CELESTIA_AUTH_KEY)
   console.error('CELESTIA_AUTH_KEY is not set!');
 
 export default (req, res) => {
+  console.log('POST /rpc', req.headers['x-api-key']);
+
   fetch(LOCAL_ENDPOINT_LIGHT_NODE, {
     method: req.method,
     headers: {
