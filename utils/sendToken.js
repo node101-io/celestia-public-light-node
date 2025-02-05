@@ -21,7 +21,10 @@ export default (recipient, callback) => {
               config.tx.fee
             )
           )
-          .then((result) => callback(null, result));
+          .then((result) => {
+            console.log("Result:", result);
+            callback(null, result);
+        });
       });
     })
     .catch((err) => callback(err));
