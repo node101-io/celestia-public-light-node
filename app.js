@@ -23,6 +23,13 @@ app.use(express.json());
 app.get('/faucet', faucetIndexGetController);
 app.get('/faucet/send/:address', faucetSendGetController);
 
+app.get("/config", (req, res) => {
+  return res.send({
+    ...config.project,
+    prefix: config.sender.option.prefix,
+  });
+});
+
 app.post('/create-wallet',
   isAuthenticated,
   createWalletPostController
