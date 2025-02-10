@@ -1,4 +1,3 @@
-import { transaction } from 'starknet';
 import config from '../../../../config.js';
 import {
   checkIPAndWalletAddressLimit,
