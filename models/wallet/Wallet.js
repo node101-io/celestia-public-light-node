@@ -70,4 +70,22 @@ WalletSchema.statics.createWallet = function (data, callback) {
   });
 };
 
+WalletSchema.statics.findWalletsByApiKey = function (api_key, callback) {
+  ApiKey.findApiKeysByFilters({
+    key: api_key,
+  }, (err, apiKey) => {
+    if (err)
+      return callback(err);
+
+    Wallet.find({
+      api_key: apiKey._id
+    })
+      .then(wallets => callback(null, wallets))
+      .catch(err => {
+        console.error(err);
+        return callback('database_error');
+      });
+  });
+};
+
 export const Wallet = mongoose.model('Wallet', WalletSchema);
