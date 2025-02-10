@@ -11,8 +11,8 @@ import isAuthenticated from './middlewares/isAuthenticated.js';
 import configGetController from './controllers/config/get.js';
 import faucetSendGetController from './controllers/faucet/send/[address]/get.js';
 
-import createWalletPostController from './controllers/create-wallet/post.js';
-import listWalletPostController from './controllers/list-wallet/post.js';
+import createWalletPostController from './controllers/wallet/create/post.js';
+import listWalletPostController from './controllers/wallet/list/post.js';
 import rpcPostController from './controllers/rpc/post.js';
 
 await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/celestia');
@@ -39,11 +39,11 @@ app.get('/config',
   configGetController
 );
 
-app.post('/list-wallet',
+app.post('/wallet/list',
   isAuthenticated,
   listWalletPostController
 );
-app.post('/create-wallet',
+app.post('/wallet/create',
   isAuthenticated,
   createWalletPostController
 );

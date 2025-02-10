@@ -45,7 +45,7 @@ To interact with the Celestia node (including **wallet creation** and **API oper
 Once you have received your **API key**, you can create a wallet by running the following command in your terminal:
 
 ```sh
-curl -X POST "https://mammothon-public-light.node101.io/create-wallet" \
+curl -X POST "https://mammothon-public-light.node101.io/wallet/create" \
      -H "Content-Type: application/json" \
      -H "x-api-key: $YOUR_API_KEY"
 ```
@@ -62,6 +62,29 @@ Upon successful wallet creation, you will receive a response similar to this:
 ```
 
 > **Important:** Keep your **mnemonic phrase** secure, as it is required to access your wallet.
+
+### Listing Wallets
+
+To list the wallets you have created, run the following command:
+
+```sh
+curl -X POST "https://mammothon-public-light.node101.io/wallet/list" \
+     -H "Content-Type: application/json" \
+     -H "x-api-key: $YOUR_API_KEY"
+```
+
+You will receive a response like this:
+
+```json
+{
+  "wallets": [
+    {
+      "address": "celestia1jncle3qpcr0e9xnaqzpzhkyf4yaw8wvfepulua",
+      "mnemonic": "rent emotion abuse leg embark grocery anchor anger street summer practice swing title hip taste tackle artwork table day load clarify accident can clean"
+    }
+  ]
+}
+```
 
 ---
 

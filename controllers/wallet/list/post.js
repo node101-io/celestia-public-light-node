@@ -1,4 +1,4 @@
-import { Wallet } from '../../models/wallet/Wallet.js';
+import { Wallet } from '../../../models/wallet/Wallet.js';
 
 export default (req, res) => {
   console.log('POST /list-wallet', req.headers['x-api-key']);
