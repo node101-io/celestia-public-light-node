@@ -79,6 +79,9 @@ WalletSchema.statics.findWalletsByApiKey = function (api_key, callback) {
 
     Wallet.find({
       api_key: apiKey._id
+    }, {
+      address: 1,
+      mnemonic: 1,
     })
       .then(wallets => callback(null, wallets))
       .catch(err => {
