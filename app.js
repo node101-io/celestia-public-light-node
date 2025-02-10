@@ -2,6 +2,7 @@ import 'dotenv/config';
 
 import express from 'express';
 import mongoose from 'mongoose';
+import { rateLimit } from 'express-rate-limit'
 
 import config from './config.js';
 
@@ -19,6 +20,14 @@ const app = express();
 
 const PORT = config.port || 3000;
 
+const rateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 2,
+  message: {
+    error: 'Too many requests, please try again in a minute.'
+  }
+});
+
 app.use(express.json());
 app.use(express.static('public', { extensions: ['html'] }));
 
@@ -35,6 +44,7 @@ app.post('/create-wallet',
 );
 app.post('/rpc',
   isAuthenticated,
+  rateLimiter,
   rpcPostController
 );
 

@@ -6,3 +6,7 @@ node_modules
 *.tsbuildinfo
 .vscode
 .prettierrc
+app.toml
+app2.toml
+config.toml
+config2.toml

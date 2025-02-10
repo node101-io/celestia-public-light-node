@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Mammothon Celestia Testnet Faucet</title>
-    <link rel="icon" href="" />
+    <link rel="icon" href="/img/favicon/favicon.ico" />
     <meta name=”robots” content="index, follow">
     <meta name="description" content="Uniform Faucet Tool For Celestia Mammoth Hackathon">
     <meta></head>
@@ -70,9 +70,9 @@
           document.getElementById("button-loading").style.display = 'none';
           this.message = `
             <div class="alert alert-${data.code !== 0 ? 'success' : 'danger'} alert-dismissible show fade mt-2" role="alert">
-            <li>${data.code !== 0 ? 'Token sent' : 'Request failed'}</li>
+            <li>${data.code !== 0 ? 'Tokens sent!' : 'Request failed!'}</li>
             ${data.code !== 0 && data.transactionHash ?
-+               `<p><strong>View the transaction on <a href="https://mocha-4.celenium.io/tx/${data.transactionHash}" target="_blank">Celenium</a></strong></p>`
+                `<p><strong>View the transaction on <a href="https://mocha-4.celenium.io/tx/${data.transactionHash}" target="_blank">Celenium</a></strong></p>`
                 : `<p class="form-control mt-1" rows="5" style="background-color:transparent">${data.result}</p>`}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
