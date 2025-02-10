@@ -8,7 +8,6 @@ import config from './config.js';
 import isAuthenticated from './middlewares/isAuthenticated.js';
 
 import configGetController from './controllers/config/get.js';
-import faucetIndexGetController from './controllers/faucet/index/get.js';
 import faucetSendGetController from './controllers/faucet/send/[address]/get.js';
 
 import createWalletPostController from './controllers/create-wallet/post.js';
@@ -21,12 +20,8 @@ const app = express();
 const PORT = config.port || 3000;
 
 app.use(express.json());
+app.use(express.static('public', { extensions: ['html'] }));
 
-app.use(express.static('public'));
-
-app.get('/faucet',
-  faucetIndexGetController
-);
 app.get('/faucet/send/:address',
   faucetSendGetController
 );

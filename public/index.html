@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mammothon Public Light Node</title>
+    <meta name="description" content="Public Light Node For Mammothon Celestia">
+  </head>
+  <body>
+    <main>
+    </main>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script type="module">
+      fetch('/GUIDE.md')
+        .then(response => response.text())
+        .then(text => document.querySelector('main').innerHTML = marked.parse(text));
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 2rem;
+      }
+    </style>
+  </body>
+</html>
