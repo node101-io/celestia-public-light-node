@@ -44,5 +44,5 @@ app.post('/rpc',
 );
 
 app.listen(PORT, () => {
-  console.log(`Faucet app listening on port ${PORT}`);
+  console.log(`App listening on port ${PORT}`);
 });
