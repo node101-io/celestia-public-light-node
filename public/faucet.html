@@ -72,7 +72,7 @@
             <div class="alert alert-${data.code !== 0 ? 'success' : 'danger'} alert-dismissible show fade mt-2" role="alert">
             <li>${data.code !== 0 ? 'Token sent' : 'Request failed'}</li>
             ${data.code !== 0 && data.transactionHash ?
-                `<p><strong>Transaction Hash:</strong> ${data.transactionHash}</p>`
++               `<p><strong>View the transaction on <a href="https://mocha-4.celenium.io/tx/${data.transactionHash}" target="_blank">Celenium</a></strong></p>`
                 : `<p class="form-control mt-1" rows="5" style="background-color:transparent">${data.result}</p>`}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
