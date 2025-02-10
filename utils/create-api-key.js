@@ -1,8 +1,11 @@
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
 
 import { ApiKey } from '../models/api-key/ApiKey.js';
 
-await mongoose.connect('mongodb://localhost:27017/celestia');
+dotenv.config('../.env');
+
+await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/celestia');
 
 if (!process.argv[2]) {
   console.error('Provide a team name');
