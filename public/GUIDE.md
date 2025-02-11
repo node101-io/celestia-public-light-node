@@ -16,23 +16,7 @@ This guide will walk you through how to use these resources efficiently.
 
 ---
 
-## 🚰 1. Request Testnet $TIA via the Faucet
-
-To request testnet $TIA, follow these simple steps:
-
-1. Go to [Faucet](https://mammothon-public-light.node101.io/faucet).
-2. Enter your **Celestia wallet address** (must start with the prefix **"celestia"**).
-3. Click the **"Request Tokens"** button.
-4. Your tokens will arrive in approximately **6 seconds**.
-5. You can verify your transaction via **[Celenium](https://mocha-4.celenium.io)** once it is processed.
-
-> **Note:**
-> - You can request tokens **only once every 24 hours**.
-> - Each request provides **10 $TIA**.
-
----
-
-## 🔐 2. Create a Remote Wallet on the Node
+## 🔐 1. Create a Remote Wallet on the Node
 
 To ensure fair usage and prevent overload, access to the Celestia node requires an **API key**.
 
@@ -88,6 +72,22 @@ You will receive a response like this:
 
 ---
 
+## 🚰 2. Request Testnet $TIA via the Faucet
+
+To request testnet $TIA, follow these simple steps:
+
+1. Go to [Faucet](https://mammothon-public-light.node101.io/faucet).
+2. Enter your **Celestia wallet address** (must start with the prefix **"celestia"**).
+3. Click the **"Request Tokens"** button.
+4. Your tokens will arrive in approximately **6 seconds**.
+5. You can verify your transaction via **[Celenium](https://mocha-4.celenium.io)** once it is processed.
+
+> **Note:**
+> - You can request tokens **only once every 24 hours**.
+> - Each request provides **10 $TIA**.
+
+---
+
 ## 🌐 3. Send Celestia Node API Requests to the Public Light Node
 
 Once you have a funded wallet on the node and your API key, you are ready to send API requests freely.
@@ -105,7 +105,7 @@ Below are some example requests to help you interact with Celestia using your AP
 ```sh
 curl -X POST "https://mammothon-public-light.node101.io/rpc" \
     -H "Content-Type: application/json" \
-    -H "x-api-key: YOUR_API_KEY" \
+    -H "x-api-key: $YOUR_API_KEY" \
     --data '{
         "id": 1,
         "jsonrpc": "2.0",
@@ -129,7 +129,7 @@ Expected Response:
 ```sh
 curl -X POST "https://mammothon-public-light.node101.io/rpc" \
     -H "Content-Type: application/json" \
-    -H "x-api-key: YOUR_API_KEY" \
+    -H "x-api-key: $YOUR_API_KEY" \
     --data '{
         "id": 1,
         "jsonrpc": "2.0",
@@ -150,6 +150,79 @@ Expected Response:
     "denom": "utia",
     "amount": "3495502772"
   }
+}
+```
+
+#### Submit a Blob
+
+```sh
+curl -X POST "https://mammothon-public-light.node101.io/rpc" \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: $API_KEY" \
+    --data '{
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "blob.Submit",
+        "params": [
+            [
+                {
+                    "namespace": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAMJ/xGlNMdE=",
+                    "data": "$HEX_ENCODED_DATA"
+                }
+            ],
+            {
+                "gas_price": 0.002,
+                "is_gas_price_set": true,
+                "signer_address": "$YOUR_WALLET_ADDRESS"
+            }
+        ]
+    }'
+```
+
+Expected Response:
+
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": 4635443
+}
+```
+
+#### Get All Blobs under a given Namespace by Block Height
+
+```sh
+curl -X POST "https://mammothon-public-light.node101.io/rpc" \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: $API_KEY" \
+    --data '{
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "blob.GetAll",
+        "params": [
+            4635443,
+            [
+               "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAMJ/xGlNMdE="
+            ]
+        ]
+    }'
+```
+
+Expected Response:
+
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": [
+    {
+      "namespace": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAMJ/xGlNMdE=",
+      "data": "$HEX_ENCODED_DATA",
+      "share_version": 0,
+      "commitment": "aHlbp+J9yub6hw/uhK6dP8hBLR2mFy78XNRRdLf2794=",
+      "index": 9
+    }
+  ]
 }
 ```
 
