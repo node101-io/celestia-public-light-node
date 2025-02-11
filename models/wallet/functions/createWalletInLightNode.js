@@ -1,5 +1,7 @@
 import childProcess from 'child_process';
 
+import { setNodeRestarting } from '../../../utils/nodeStatus.js';
+
 const CREATE_WALLET_IN_LIGHT_NODE_COMMAND = data => `
   docker exec celestia-light-node bash -c '
     cel-key add ${data.wallet_name} \
@@ -9,6 +11,7 @@ const CREATE_WALLET_IN_LIGHT_NODE_COMMAND = data => `
       --output json
   '
 `;
+const RESTART_LIGHT_NODE_COMMAND = `docker restart celestia-light-node`;
 
 export const createWalletInLightNode = (data, callback) => {
   if (!data || typeof data !== 'object')
@@ -23,9 +26,17 @@ export const createWalletInLightNode = (data, callback) => {
 
     const wallet = JSON.parse(stdout);
 
-    return callback(null, {
-      address: wallet.address,
-      mnemonic: wallet.mnemonic
+    setNodeRestarting(true);
+    childProcess.exec(RESTART_LIGHT_NODE_COMMAND, (err, stderr, stdout) => {
+      setNodeRestarting(false);
+
+      if (err)
+        return callback('light_node_error');
+
+      return callback(null, {
+        address: wallet.address,
+        mnemonic: wallet.mnemonic
+      });
     });
   });
 };

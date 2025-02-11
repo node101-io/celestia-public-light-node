@@ -6,7 +6,7 @@ export default {
     path: './db/faucet.db',
   },
   project: {
-    name: 'Celestia Mammothon Faucet Light Node Interface',
+    name: 'Celestia Mammothon',
     logo: '/img/logo.webp',
   },
   blockchain: {
