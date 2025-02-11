@@ -1,3 +1,5 @@
+import restartLightNode from '../../../utils/restartLightNode.js';
+
 import { Wallet } from '../../../models/wallet/Wallet.js';
 
 export default (req, res) => {
