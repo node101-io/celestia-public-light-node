@@ -138,18 +138,8 @@ wss.on('connection', (ws, req) => {
         return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
       }
 
-      // Retry logic for sending messages
-      let retryCount = 0;
-      const maxRetries = 3;
       const tryToSendMessage = () => {
-        if (nodeWs.ws?.readyState === WebSocket.OPEN) {
-          nodeWs.send(message);
-        } else if (retryCount < maxRetries) {
-          retryCount++;
-          setTimeout(tryToSendMessage, 1000);
-        } else {
-          ws.send(JSON.stringify({ error: 'light_node_not_connected' }));
-        }
+        nodeWs.send(message);
       };
 
       tryToSendMessage();
