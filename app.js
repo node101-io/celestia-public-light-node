@@ -66,133 +66,98 @@ app.post('/rpc',
 );
 
 ////////////////////////////////////////////////////////////////////////////
-// İstemci Bazında Ayrı İşlem Yönetimi için Gerekli Yapı
+// Her istemcinin sorguları için pending (bekleyen) sorguları saklamak üzere Map oluşturuyoruz.
+const pendingRequests = new Map();
 
-// Her client bağlantısına ait; handler ile saklayacağımız ek state nesnesi
-// buradaki obje, örneğin abonelik/subscribe mesajını saklamak için kullanılıyor.
-const activeConnections = new Map();
-
-/**
- * Her istemci (client) için node'dan gelecek mesajları dinleyen handler döndürür.
- * Eğer mesaj, client'a ait işlem veya sorgu içeriyorsa filtreleme yapabilirsiniz.
- */
-function createClientHandler(clientWs) {
-  return function handleNodeMessage(event) {
-    try {
-      const messageData = JSON.parse(event.data);
-      // Eğer mesajın içinde abonelik kimliği ya da client'a ait başka tanımlayıcı varsa
-      // burada filtreleme yapabilirsiniz.
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.send(JSON.stringify(messageData));
-      }
-    } catch (error) {
-      console.error('İstemci mesajı işlenirken hata oluştu:', error);
+// ReconnectingWebSocket ile light node bağlantısı yapılıyor.
+const nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
+  WebSocket: WebSocket,
+  WebSocketOptions: {
+    headers: {
+      'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY
     }
-  };
-}
-
-/**
- * Node (light node) ile yeniden bağlanmayı (reconnect) yöneten fonksiyon.
- * ReconnectingWebSocket nesnesini oluşturuyor ve 'open' eventinde,
- * mevcut tüm client handler'larını yeniden ekleyip, eğer varsa saklanan abonelik mesajını
- * node'a yeniden gönderiyor.
- */
-function nodeWsSetup() {
-  const nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
-    WebSocket: WebSocket,
-    WebSocketOptions: {
-      headers: {
-        'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY
-      }
-    }
-  });
-
-  nodeWs.addEventListener('open', () => {
-    console.log('✅ Light node ile bağlantı kuruldu (veya yeniden bağlanıldı).');
-
-    // Tüm aktif client bağlantıları için:
-    activeConnections.forEach((clientData, clientWs) => {
-      // Önce eski handler'ı kaldırıp, aynı handler'ı yeniden ekliyoruz.
-      nodeWs.removeEventListener('message', clientData.handler);
-      nodeWs.addEventListener('message', clientData.handler);
-
-      // Eğer client, daha önce bir abonelik mesajı (örneğin "blob.Subscribe") gönderdiyse,
-      // node restart sonrası bu mesajı yeniden göndermek gerekebilir.
-      if (clientData.lastMessage) {
-        console.log('Client için abonelik mesajı yeniden gönderiliyor:', clientData.lastMessage);
-        nodeWs.send(clientData.lastMessage);
-      }
-    });
-  });
-
-  nodeWs.addEventListener('close', () => {
-    console.log('Light node ile bağlantı kapandı.');
-  });
-  nodeWs.addEventListener('error', (err) => {
-    console.error('Light node bağlantı hatası:', err);
-  });
-
-  return nodeWs;
-}
-
-// Tek bir global nodeWs örneği kullanıyoruz:
-const nodeWs = nodeWsSetup();
-
-////////////////////////////////////////////////////////////////////////////
-// WebSocket Sunucu (wss) ile İstemci Bağlantılarının Yönetimi
-
-wss.on('connection', (ws, req) => {
-  // İstemciden x-api-key header'ı gelmiyorsa bağlantıyı hemen kapatıyoruz.
-  if (!req.headers['x-api-key']) {
-    return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
   }
+});
 
-  // API key doğrulaması (model üzerinden)
-  ApiKey.findApiKeysByFilters({ key: req.headers['x-api-key'] }, async (
-    err,
-    api_keys
-  ) => {
-    if (err || !api_keys)
-      return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
+// Merkezi dinleyici: nodeWs'den gelen tüm mesajları alıp, içindeki requestId'ye göre ilgili istemciye gönderecek.
+nodeWs.addEventListener('message', (event) => {
+  try {
+    const messageData = JSON.parse(event.data);
+    // Gelen mesajın formatı örn.: { requestId: "12345", result: { ... } }
+    const { requestId, result, error } = messageData;
+    
+    if (pendingRequests.has(requestId)) {
+      const clientWs = pendingRequests.get(requestId);
+      if (clientWs.readyState === WebSocket.OPEN) {
+        clientWs.send(
+          JSON.stringify({ requestId, result, error })
+        );
+      }
+      pendingRequests.delete(requestId);
+    } else {
+      console.warn(
+        `Gelen response için requestId bulunamadı: ${requestId}`
+      );
+    }
+  } catch (err) {
+    console.error('Gelen mesaj parse edilemedi:', err);
+  }
+});
 
-    if (await isNodeRestarting())
-      ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+// İstemci bağlantılarının kurulması
+wss.on('connection', (ws, req) => {
+  if (!req.headers['x-api-key'])
+    return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
-    // Her client için node mesajlarını dinleyecek özel handler'ı oluşturuyoruz.
-    const clientHandler = createClientHandler(ws);
+  ApiKey.findApiKeysByFilters(
+    { key: req.headers['x-api-key'] },
+    async (err, api_keys) => {
+      if (err || !api_keys)
+        return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
-    // Her client bağlantısı için; handler ve client'a ait state bilgisini saklıyoruz.
-    activeConnections.set(ws, { handler: clientHandler, lastMessage: null });
-
-    // İstemciden gelen mesajları; nodeWs üzerinden light node'a iletmek için:
-    ws.on('message', async (message) => {
-      if (await isNodeRestarting())
-        return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
-
-      // Gönderilen mesajı parse edip, örneğin "blob.Subscribe" gibi mesajları
-      // saklamak için kullanıyoruz. Böylece node restart sonrası aynı mesajı yeniden
-      // gönderebiliriz.
-      try {
-        const parsedMessage = JSON.parse(message);
-        if (parsedMessage.method === 'blob.Subscribe') {
-          // Client'ın abonelik mesajını saklıyoruz.
-          const clientData = activeConnections.get(ws);
-          if (clientData) clientData.lastMessage = message;
-        }
-      } catch (e) {
-        console.error('Client mesajı parse edilirken hata:', e);
+      if (await isNodeRestarting()) {
+        ws.send(JSON.stringify({ error: 'node_is_restarting' }));
       }
 
-      // İstemci mesajını light node'a gönderiyoruz:
-      nodeWs.send(message);
-    });
+      // İstemciden gelen mesajlarda, client kendi requestId'sini oluşturup göndereceğini farz ediyoruz.
+      ws.on('message', async (message) => {
+        if (await isNodeRestarting())
+          return ws.send(
+            JSON.stringify({ error: 'node_is_restarting' })
+          );
 
-    // Client bağlantısı kapandığında; handler'ı kaldırıp, saklanan state bilgisini temizliyoruz.
-    ws.on('close', () => {
-      nodeWs.removeEventListener('message', clientHandler);
-      activeConnections.delete(ws);
-    });
-  });
+        try {
+          const clientMessage = JSON.parse(message);
+          // clientMessage ör. format: { requestId: "12345", type: "some_query", payload: { ... } }
+          if (!clientMessage.requestId)
+            return ws.send(
+              JSON.stringify({
+                error: 'Eksik requestId: her sorguya benzersiz bir requestId ekleyin.'
+              })
+            );
+
+          // Bekleyen sorguları saklamak
+          pendingRequests.set(clientMessage.requestId, ws);
+
+          // Light node'a yönlendiriyoruz.  
+          // Örneğin, clientMessage doğrudan veya gerekirse dönüştürülerek gönderilebilir.
+          nodeWs.send(JSON.stringify(clientMessage));
+        } catch (err) {
+          console.error('Client mesajı parse edilemedi:', err);
+          ws.send(JSON.stringify({ error: 'Invalid JSON message' }));
+        }
+      });
+
+      // Bağlantı kapanınca pendingRequests'ten de temizleyelim
+      ws.on('close', () => {
+        for (const [key, clientWs] of pendingRequests.entries()) {
+          if (clientWs === ws) {
+            pendingRequests.delete(key);
+          }
+        }
+      });
+    }
+  );
 });
 
 server.listen(PORT, () => {
