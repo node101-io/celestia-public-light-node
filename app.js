@@ -67,45 +67,32 @@ app.post('/rpc',
 
 ////////////////////////////////////////////////////////////////////////////
 
-let nodeWs = null;
-
-const connectToNode = () => {
-  try {
-    if (nodeWs) {
-      nodeWs.removeAllListeners();
-      nodeWs.close();
+let nodeWs = new WsReconnect({ 
+  reconnectDelay: 5000,
+  wsOptions: {
+    headers: {
+      'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY,
     }
-
-    nodeWs = new WsReconnect({ 
-      reconnectDelay: 5000,
-      wsOptions: {
-        headers: {
-          'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY,
-        }
-      }
-    });
-
-    nodeWs.open(LIGHT_NODE_ENDPOINT);
-
-    nodeWs.on('open', () => {
-      console.log('Connected to light node');
-    });
-
-    nodeWs.on('reconnect', () => {
-      console.log('Attempting to reconnect to light node...');
-    });
-
-    nodeWs.on('error', (error) => {
-      console.error('Light node connection error:', error);
-    });
-
-    nodeWs.on('close', () => {
-      console.log('Disconnected from light node');
-    });
-  } catch (error) {
-    console.error('Failed to connect to light node:', error);
   }
-};
+});
+
+nodeWs.open(LIGHT_NODE_ENDPOINT);
+
+nodeWs.on('open', () => {
+  console.log('Connected to light node');
+});
+
+nodeWs.on('reconnect', () => {
+  console.log('Attempting to reconnect to light node...');
+});
+
+nodeWs.on('error', (error) => {
+  console.error('Light node connection error:', error);
+});
+
+nodeWs.on('close', () => {
+  console.log('Disconnected from light node');
+});
 
 wss.on('connection', (ws, req) => {
   if (!req.headers['x-api-key'])
@@ -151,8 +138,6 @@ wss.on('connection', (ws, req) => {
     });
   });
 });
-
-connectToNode();
 
 server.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);
