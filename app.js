@@ -5,6 +5,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { rateLimit } from 'express-rate-limit'
 import { WebSocketServer, WebSocket } from 'ws';
+import { WsReconnect } from 'websocket-reconnect';
 
 import { ApiKey } from './models/api-key/ApiKey.js';
 
@@ -67,45 +68,42 @@ app.post('/rpc',
 ////////////////////////////////////////////////////////////////////////////
 
 let nodeWs = null;
-const activeListeners = [];
 
 const connectToNode = () => {
   try {
     if (nodeWs) {
       nodeWs.removeAllListeners();
-      nodeWs.terminate();
+      nodeWs.close();
     }
 
-    nodeWs = new WebSocket(LIGHT_NODE_ENDPOINT, {
-      headers: {
-        'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY,
+    nodeWs = new WsReconnect({ 
+      reconnectDelay: 5000,
+      wsOptions: {
+        headers: {
+          'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY,
+        }
       }
     });
 
+    nodeWs.open(LIGHT_NODE_ENDPOINT);
+
     nodeWs.on('open', () => {
       console.log('Connected to light node');
-      // Node bağlantısı yenilendiğinde tüm aktif listener'ları yeniden bağla
-      // ve subscription mesajlarını tekrar gönder
-      activeListeners.forEach(listener => {
-        nodeWs.on('message', listener.handleNodeMessage);
-        if (listener.lastSubscriptionMessage) {
-          nodeWs.send(listener.lastSubscriptionMessage);
-        }
-      });
+    });
+
+    nodeWs.on('reconnect', () => {
+      console.log('Attempting to reconnect to light node...');
     });
 
     nodeWs.on('error', (error) => {
       console.error('Light node connection error:', error);
-      nodeWs.close();
     });
 
     nodeWs.on('close', () => {
-      console.log('Disconnected from light node, attempting to reconnect...');
-      setTimeout(connectToNode, 5000);
+      console.log('Disconnected from light node');
     });
   } catch (error) {
     console.error('Failed to connect to light node:', error);
-    setTimeout(connectToNode, 5000);
   }
 };
 
@@ -125,14 +123,6 @@ wss.on('connection', (ws, req) => {
         ws.send(data);
     };
 
-    // Listener bilgisini genişletiyoruz, son subscription mesajını da tutacak
-    const listenerInfo = { 
-      ws, 
-      handleNodeMessage,
-      lastSubscriptionMessage: null 
-    };
-    activeListeners.push(listenerInfo);
-
     if (nodeWs)
       nodeWs.on('message', handleNodeMessage);
 
@@ -140,50 +130,25 @@ wss.on('connection', (ws, req) => {
       if (await isNodeRestarting())
         return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
 
-      // Gelen mesaj bir subscription ise kaydedelim
-      const msgStr = message.toString();
-      try {
-        const msgObj = JSON.parse(msgStr);
-        if (msgObj.method === 'blob.Subscribe') {
-          // Bu client'ın listener bilgisini bulup subscription mesajını kaydedelim
-          const listener = activeListeners.find(l => l.ws === ws);
-          if (listener) {
-            listener.lastSubscriptionMessage = msgStr;
-          }
-        }
-      } catch (e) {
-        console.error('Failed to parse message:', e);
-      }
-
       if (nodeWs && nodeWs.readyState === WebSocket.OPEN) {
         nodeWs.send(message);
       }
     });
 
     ws.on('close', () => {
-      // Önce nodeWs listener'ını kaldır
       if (nodeWs) {
         nodeWs.removeListener('message', handleNodeMessage);
       }
-      
-      // Active listeners array'inden kaldır
-      const index = activeListeners.findIndex(l => l.ws === ws);
-      if (index !== -1) {
-        // Listener'ı array'den çıkarmadan önce tüm referanslarını temizle
-        const listener = activeListeners[index];
-        listener.ws = null;
-        listener.handleNodeMessage = null;
-        listener.lastSubscriptionMessage = null;
-        activeListeners.splice(index, 1);
-      }
-      
-      clearInterval(intervalId);
     });
 
     const intervalId = setInterval(async () => {
       if (await isNodeRestarting())
         ws.send(JSON.stringify({ error: 'node_is_restarting' }));
     }, 5000);
+
+    ws.on('close', () => {
+      clearInterval(intervalId);
+    });
   });
 });
 
