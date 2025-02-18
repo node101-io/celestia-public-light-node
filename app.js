@@ -67,7 +67,7 @@ app.post('/rpc',
 
 ////////////////////////////////////////////////////////////////////////////
 
-let nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
+const nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
   WebSocket: WebSocket,
   WebSocketOptions: {
     headers: {
@@ -76,24 +76,17 @@ let nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
   }
 });
 
-console.log('Attempting initial connection to light node...');
-
-nodeWs.addEventListener('open', () => {
-  console.log('✅ Successfully connected to light node');
-});
-nodeWs.addEventListener('reconnect', () => {
-  console.log('🔄 Attempting to reconnect to light node...');
+nodeWs.addEventListener('close', () => {
+  console.log('❌ Disconnected from light node');
 });
 nodeWs.addEventListener('error', (error) => {
   console.error('❌ Light node connection error:', error);
 });
-nodeWs.addEventListener('close', () => {
-  console.log('❌ Disconnected from light node');
+nodeWs.addEventListener('open', () => {
+  console.log('✅ Successfully connected to light node');
 });
 
-wss.on('connection', (ws, req) => {
-  console.log('📱 New client connection attempt from IP:', req.socket.remoteAddress);
-  
+wss.on('connection', (ws, req) => {  
   if (!req.headers['x-api-key'])
     return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
@@ -101,12 +94,14 @@ wss.on('connection', (ws, req) => {
     if (err || !api_keys)
       return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
-    console.log('✅ Client authenticated successfully');
-
     if (await isNodeRestarting())
       ws.send(JSON.stringify({ error: 'node_is_restarting' }));
 
-    nodeWs.addEventListener('message', data => ws.send(data.data));
+    function handleNodeMessage(data) {
+      ws.send(data.data);
+    };
+
+    nodeWs.addEventListener('message', handleNodeMessage);
 
     ws.on('message', async (message) => {      
       if (await isNodeRestarting())
@@ -116,7 +111,7 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => {
-      nodeWs.removeEventListener('message', data => ws.send(data.data));
+      nodeWs.removeEventListener('message', handleNodeMessage);
     });
   });
 });
