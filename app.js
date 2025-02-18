@@ -6,6 +6,8 @@ import mongoose from 'mongoose';
 import { rateLimit } from 'express-rate-limit'
 import { WebSocketServer, WebSocket } from 'ws';
 
+import { ApiKey } from './models/api-key/ApiKey.js';
+
 import config from './config.js';
 
 import isAuthenticated from './middlewares/isAuthenticated.js';
