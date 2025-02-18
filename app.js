@@ -106,60 +106,29 @@ nodeWs.addEventListener('close', () => {
 wss.on('connection', (ws, req) => {
   console.log('📱 New client connection attempt from IP:', req.socket.remoteAddress);
   
-  if (!req.headers['x-api-key']) {
-    console.log('❌ Client connection rejected: No API key provided');
+  if (!req.headers['x-api-key'])
     return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
-  }
 
   ApiKey.findApiKeysByFilters({ key: req.headers['x-api-key'] }, async (err, api_keys) => {
-    if (err || !api_keys) {
-      console.log('❌ Client connection rejected: Invalid API key');
+    if (err || !api_keys)
       return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
-    }
 
     console.log('✅ Client authenticated successfully');
 
-    if (await isNodeRestarting()) {
-      console.log('⚠️ Warning client: Node is restarting');
+    if (await isNodeRestarting())
       ws.send(JSON.stringify({ error: 'node_is_restarting' }));
-    }
 
-    const handleNodeMessage = (data) => {
-      ws.send(data.data);
-    };
+    nodeWs.addEventListener('message', () => ws.send(data.data));
 
-    nodeWs.addEventListener('message', handleNodeMessage);
-
-    ws.on('message', async (message) => {
-      console.log('📥 Received message from client:', message.toString().substring(0, 100) + '...');
-      
-      if (await isNodeRestarting()) {
-        console.log('⚠️ Rejecting client message: Node is restarting');
+    ws.on('message', async (message) => {      
+      if (await isNodeRestarting())
         return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
-      }
 
-      const tryToSendMessage = () => {
-        nodeWs.send(message);
-      };
-
-      tryToSendMessage();
+      nodeWs.send(message);
     });
 
     ws.on('close', () => {
-      console.log('👋 Client disconnected, cleaning up listeners');
-      nodeWs.removeListener('message', handleNodeMessage);
-    });
-
-    const intervalId = setInterval(async () => {
-      if (await isNodeRestarting()) {
-        console.log('⚠️ Periodic check: Warning client about node restart');
-        ws.send(JSON.stringify({ error: 'node_is_restarting' }));
-      }
-    }, 5000);
-
-    ws.on('close', () => {
-      console.log('🧹 Clearing periodic restart check interval');
-      clearInterval(intervalId);
+      nodeWs.removeEventListener('message', () => ws.send(data.data));
     });
   });
 });
