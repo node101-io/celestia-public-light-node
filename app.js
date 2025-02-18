@@ -80,19 +80,31 @@ console.log('Attempting initial connection to light node...');
 nodeWs.open(LIGHT_NODE_ENDPOINT);
 
 nodeWs.on('open', () => {
-  console.log('✅ Successfully connected to light node');
+  console.log('✅ Successfully connected to light node', {
+    wsExists: !!nodeWs.ws,
+    readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
+  });
 });
 
 nodeWs.on('reconnect', () => {
-  console.log('🔄 Attempting to reconnect to light node...');
+  console.log('🔄 Attempting to reconnect to light node...', {
+    wsExists: !!nodeWs.ws,
+    readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
+  });
 });
 
 nodeWs.on('error', (error) => {
-  console.error('❌ Light node connection error:', error);
+  console.error('❌ Light node connection error:', error, {
+    wsExists: !!nodeWs.ws,
+    readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
+  });
 });
 
 nodeWs.on('close', () => {
-  console.log('❌ Disconnected from light node');
+  console.log('❌ Disconnected from light node', {
+    wsExists: !!nodeWs.ws,
+    readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
+  });
 });
 
 wss.on('connection', (ws, req) => {
@@ -135,15 +147,30 @@ wss.on('connection', (ws, req) => {
         return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
       }
 
-      if (nodeWs.ws && nodeWs.ws.readyState === WebSocket.OPEN) {
-        console.log('📤 Forwarding client message to light node');
-        nodeWs.send(message);
-      } else {
-        console.log('⚠️ Cannot forward message: Light node connection not open', {
-          wsExists: !!nodeWs.ws,
-          readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
-        });
-      }
+      // Retry logic for sending messages
+      let retryCount = 0;
+      const maxRetries = 3;
+      const tryToSendMessage = () => {
+        if (nodeWs.ws && nodeWs.ws.readyState === WebSocket.OPEN) {
+          console.log('📤 Forwarding client message to light node');
+          nodeWs.send(message);
+        } else if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`⏳ Waiting for connection... Retry ${retryCount}/${maxRetries}`, {
+            wsExists: !!nodeWs.ws,
+            readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
+          });
+          setTimeout(tryToSendMessage, 1000); // Wait 1 second before retry
+        } else {
+          console.log('❌ Failed to send message after retries', {
+            wsExists: !!nodeWs.ws,
+            readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
+          });
+          ws.send(JSON.stringify({ error: 'light_node_not_connected' }));
+        }
+      };
+
+      tryToSendMessage();
     });
 
     ws.on('close', () => {
