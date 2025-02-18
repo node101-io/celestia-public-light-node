@@ -64,8 +64,6 @@ app.post('/rpc',
   rpcPostController
 );
 
-////////////////////////////////////////////////////////////////////////////
-
 let nodeWs = null;
 
 const connectToNode = () => {

@@ -1,6 +1,6 @@
-# gMammoth! 🦣
+# gMammoth 🦣
 
-Welcome to **Mammothon**—happy coding! 🚀
+Welcome to **Mammothon**—happy coding! ��
 
 ## Introduction
 
@@ -14,9 +14,7 @@ To ease this burden, **[node101](https://node101.io)** is offering you access to
 
 This guide will walk you through how to use these resources efficiently.
 
----
-
-## 🔐 1. Create a Remote Wallet on the Node
+## 1. Create a Remote Wallet on the Node 🔐
 
 To ensure fair usage and prevent overload, access to the Celestia node requires an **API key**.
 
@@ -70,9 +68,7 @@ You will receive a response like this:
 }
 ```
 
----
-
-## 🚰 2. Request Testnet $TIA via the Faucet
+## 2. Request Testnet $TIA via the Faucet 🚰
 
 To request testnet $TIA, follow these simple steps:
 
@@ -86,15 +82,41 @@ To request testnet $TIA, follow these simple steps:
 > - You can request tokens **only once every 24 hours**.
 > - Each request provides **10 $TIA**.
 
----
-
-## 🌐 3. Send Celestia Node API Requests to the Public Light Node
+## 3. Send Celestia Node API Requests to the Public Light Node 🌐
 
 Once you have a funded wallet on the node and your API key, you are ready to send API requests freely.
 
 > **Note 1:** We do not require a Celestia Authorization Key as we handle authentication through the API key provided to you.
 
 > **Note 2:** To prevent overload, you can send 10 requests per minute.
+
+### WebSocket Connection
+
+For real-time communication with the node, you can use our WebSocket endpoint:
+
+```javascript
+const ws = new WebSocket('wss://mammothon-public-light.node101.io/ws', {
+  headers: {
+    'x-api-key': 'YOUR_API_KEY'
+  }
+});
+
+// Handle incoming messages
+ws.on('message', (event) => {
+  console.log('Received:', event.data);
+});
+
+// Handle connection closure
+ws.on('close', (event) => {
+  if (event.code === 1000)
+    console.log('Connection closed. Please reconnect after 10 seconds.');
+});
+
+// Send messages to the node
+ws.send(yourMessage);
+```
+
+> **Important:** The WebSocket connection will be terminated if the node undergoes a restart. These restarts are necessary to integrate newly created wallets into the node's keyring. When this happens, you'll receive a closure event with the reason `node_is_restarting`. It's recommended to implement a reconnection strategy with an appropriate delay.
 
 ### Example API Requests
 
