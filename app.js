@@ -161,14 +161,22 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => {
+      // Önce nodeWs listener'ını kaldır
       if (nodeWs) {
         nodeWs.removeListener('message', handleNodeMessage);
       }
-      // Client kapandığında listener'ı active listeners array'inden kaldır
+      
+      // Active listeners array'inden kaldır
       const index = activeListeners.findIndex(l => l.ws === ws);
       if (index !== -1) {
+        // Listener'ı array'den çıkarmadan önce tüm referanslarını temizle
+        const listener = activeListeners[index];
+        listener.ws = null;
+        listener.handleNodeMessage = null;
+        listener.lastSubscriptionMessage = null;
         activeListeners.splice(index, 1);
       }
+      
       clearInterval(intervalId);
     });
 
