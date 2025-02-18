@@ -76,61 +76,87 @@ let nodeWs = new WsReconnect({
   }
 });
 
+console.log('Attempting initial connection to light node...');
 nodeWs.open(LIGHT_NODE_ENDPOINT);
 
 nodeWs.on('open', () => {
-  console.log('Connected to light node');
+  console.log('✅ Successfully connected to light node');
 });
 
 nodeWs.on('reconnect', () => {
-  console.log('Attempting to reconnect to light node...');
+  console.log('🔄 Attempting to reconnect to light node...');
 });
 
 nodeWs.on('error', (error) => {
-  console.error('Light node connection error:', error);
+  console.error('❌ Light node connection error:', error);
 });
 
 nodeWs.on('close', () => {
-  console.log('Disconnected from light node');
+  console.log('❌ Disconnected from light node');
 });
 
 wss.on('connection', (ws, req) => {
-  if (!req.headers['x-api-key'])
+  console.log('📱 New client connection attempt from IP:', req.socket.remoteAddress);
+  
+  if (!req.headers['x-api-key']) {
+    console.log('❌ Client connection rejected: No API key provided');
     return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
+  }
 
   ApiKey.findApiKeysByFilters({ key: req.headers['x-api-key'] }, async (err, api_keys) => {
-    if (err || !api_keys)
+    if (err || !api_keys) {
+      console.log('❌ Client connection rejected: Invalid API key');
       return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
+    }
 
-    if (await isNodeRestarting())
+    console.log('✅ Client authenticated successfully');
+
+    if (await isNodeRestarting()) {
+      console.log('⚠️ Warning client: Node is restarting');
       ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+    }
 
     const handleNodeMessage = (data) => {
-      if (ws.readyState === WebSocket.OPEN)
+      if (ws.readyState === WebSocket.OPEN) {
+        console.log('📤 Forwarding light node response to client:', data.toString().substring(0, 100) + '...');
         ws.send(data);
+      } else {
+        console.log('⚠️ Cannot forward message: Client connection not open');
+      }
     };
 
     nodeWs.on('message', handleNodeMessage);
 
     ws.on('message', async (message) => {
-      if (await isNodeRestarting())
+      console.log('📥 Received message from client:', message.toString().substring(0, 100) + '...');
+      
+      if (await isNodeRestarting()) {
+        console.log('⚠️ Rejecting client message: Node is restarting');
         return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+      }
 
-      if (nodeWs && nodeWs.readyState === WebSocket.OPEN) {
+      if (nodeWs.readyState === WebSocket.OPEN) {
+        console.log('📤 Forwarding client message to light node');
         nodeWs.send(message);
+      } else {
+        console.log('⚠️ Cannot forward message: Light node connection not open');
       }
     });
 
     ws.on('close', () => {
+      console.log('👋 Client disconnected, cleaning up listeners');
       nodeWs.removeListener('message', handleNodeMessage);
     });
 
     const intervalId = setInterval(async () => {
-      if (await isNodeRestarting())
+      if (await isNodeRestarting()) {
+        console.log('⚠️ Periodic check: Warning client about node restart');
         ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+      }
     }, 5000);
 
     ws.on('close', () => {
+      console.log('🧹 Clearing periodic restart check interval');
       clearInterval(intervalId);
     });
   });
