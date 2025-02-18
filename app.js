@@ -8,6 +8,8 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 import { ApiKey } from './models/api-key/ApiKey.js';
 
+import { isNodeRestarting } from './utils/nodeStatus.js';
+
 import config from './config.js';
 
 import isAuthenticated from './middlewares/isAuthenticated.js';
