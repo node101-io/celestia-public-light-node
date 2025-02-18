@@ -5,7 +5,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { rateLimit } from 'express-rate-limit'
 import { WebSocketServer, WebSocket } from 'ws';
-import { WsReconnect } from 'websocket-reconnect';
+import ReconnectingWebSocket from '@opensumi/reconnecting-websocket';
 
 import { ApiKey } from './models/api-key/ApiKey.js';
 
@@ -67,9 +67,8 @@ app.post('/rpc',
 
 ////////////////////////////////////////////////////////////////////////////
 
-let nodeWs = new WsReconnect({ 
-  reconnectDelay: 5000,
-  wsOptions: {
+let nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
+  WebSocketOptions: {
     headers: {
       'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY,
     }
