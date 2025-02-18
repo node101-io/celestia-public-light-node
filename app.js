@@ -135,11 +135,14 @@ wss.on('connection', (ws, req) => {
         return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
       }
 
-      if (nodeWs.readyState === WebSocket.OPEN) {
+      if (nodeWs.ws && nodeWs.ws.readyState === WebSocket.OPEN) {
         console.log('📤 Forwarding client message to light node');
         nodeWs.send(message);
       } else {
-        console.log('⚠️ Cannot forward message: Light node connection not open');
+        console.log('⚠️ Cannot forward message: Light node connection not open', {
+          wsExists: !!nodeWs.ws,
+          readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
+        });
       }
     });
 
