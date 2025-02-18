@@ -77,30 +77,29 @@ let nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
 });
 
 console.log('Attempting initial connection to light node...');
-nodeWs.open(LIGHT_NODE_ENDPOINT);
 
-nodeWs.on('open', () => {
+nodeWs.addEventListener('open', () => {
   console.log('✅ Successfully connected to light node', {
     wsExists: !!nodeWs.ws,
     readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
   });
 });
 
-nodeWs.on('reconnect', () => {
+nodeWs.addEventListener('reconnect', () => {
   console.log('🔄 Attempting to reconnect to light node...', {
     wsExists: !!nodeWs.ws,
     readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
   });
 });
 
-nodeWs.on('error', (error) => {
+nodeWs.addEventListener('error', (error) => {
   console.error('❌ Light node connection error:', error, {
     wsExists: !!nodeWs.ws,
     readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
   });
 });
 
-nodeWs.on('close', () => {
+nodeWs.addEventListener('close', () => {
   console.log('❌ Disconnected from light node', {
     wsExists: !!nodeWs.ws,
     readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
@@ -137,7 +136,7 @@ wss.on('connection', (ws, req) => {
       }
     };
 
-    nodeWs.on('message', handleNodeMessage);
+    nodeWs.addEventListener('message', handleNodeMessage);
 
     ws.on('message', async (message) => {
       console.log('📥 Received message from client:', message.toString().substring(0, 100) + '...');
