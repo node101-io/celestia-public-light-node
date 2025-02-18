@@ -5,7 +5,6 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { rateLimit } from 'express-rate-limit'
 import { WebSocketServer, WebSocket } from 'ws';
-import ReconnectingWebSocket from '@opensumi/reconnecting-websocket';
 
 import { ApiKey } from './models/api-key/ApiKey.js';
 
@@ -67,53 +66,40 @@ app.post('/rpc',
 
 ////////////////////////////////////////////////////////////////////////////
 
-// İstemciden gelen pending sorguları tutmak için Map oluşturuyoruz.
-const pendingRequests = new Map();
+let nodeWs = null;
 
-// ReconnectingWebSocket ile light node bağlantısı yapılıyor.
-const nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
-  WebSocket: WebSocket,
-  WebSocketOptions: {
-    headers: {
-      'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY
-    }
-  }
-});
-
-// Merkezi dinleyici: nodeWs'den gelen tüm mesajları alıp,
-// içindeki requestId veya id alanına göre ilgili istemciye gönderiyoruz.
-nodeWs.addEventListener('message', (event) => {
+const connectToNode = () => {
   try {
-    const messageData = JSON.parse(event.data);
-    // Gelen mesaj örneğin: { "jsonrpc": "2.0", "result": { ... }, "id": 31 }
-    const requestKey = messageData.requestId || messageData.id;
-
-    if (!requestKey) {
-      console.warn('Gelen mesajda requestKey bulunamadı');
-      return;
+    if (nodeWs) {
+      nodeWs.removeAllListeners();
+      nodeWs.terminate();
     }
 
-    if (pendingRequests.has(requestKey)) {
-      const clientWs = pendingRequests.get(requestKey);
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.send(
-          JSON.stringify({
-            requestId: requestKey, // veya "id" ismi de kullanılabilir
-            result: messageData.result,
-            error: messageData.error
-          })
-        );
+    nodeWs = new WebSocket(LIGHT_NODE_ENDPOINT, {
+      headers: {
+        'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY,
       }
-      pendingRequests.delete(requestKey);
-    } else {
-      console.warn(`Gelen response için requestKey bulunamadı: ${requestKey}`);
-    }
-  } catch (err) {
-    console.error('Gelen mesaj parse edilemedi:', err);
-  }
-});
+    });
 
-// İstemci bağlantılarının kurulması
+    nodeWs.on('open', () => {
+      console.log('Connected to light node');
+    });
+
+    nodeWs.on('error', (error) => {
+      console.error('Light node connection error:', error);
+      nodeWs.close();
+    });
+
+    nodeWs.on('close', () => {
+      console.log('Disconnected from light node, attempting to reconnect...');
+      setTimeout(connectToNode, 5000);
+    });
+  } catch (error) {
+    console.error('Failed to connect to light node:', error);
+    setTimeout(connectToNode, 5000);
+  }
+};
+
 wss.on('connection', (ws, req) => {
   if (!req.headers['x-api-key'])
     return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
@@ -122,53 +108,44 @@ wss.on('connection', (ws, req) => {
     if (err || !api_keys)
       return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
-    if (await isNodeRestarting()) {
+    if (await isNodeRestarting())
       ws.send(JSON.stringify({ error: 'node_is_restarting' }));
-    }
 
-    // İstemciden gelen mesajlarda, client'in kendi benzersiz requestId veya id göndereceğini varsayıyoruz.
+    const handleNodeMessage = (data) => {
+      if (ws.readyState === WebSocket.OPEN)
+        ws.send(data);
+    };
+
+    if (nodeWs)
+      nodeWs.on('message', handleNodeMessage);
+
     ws.on('message', async (message) => {
-      if (await isNodeRestarting()) {
-        return ws.send(
-          JSON.stringify({ error: 'node_is_restarting' })
-        );
-      }
+      if (await isNodeRestarting())
+        return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
 
-      try {
-        const clientMessage = JSON.parse(message);
-        // Mesaj formatı örn: { "method": "blob.Subscribe", "params": [...], 
-        //                   "jsonrpc": "2.0", "id": 31, "requestId": 31 }
-        const requestKey = clientMessage.requestId || clientMessage.id;
-        if (!requestKey) {
-          return ws.send(
-            JSON.stringify({
-              error:
-                'Eksik identifier: her sorguya benzersiz bir requestId veya id ekleyin.'
-            })
-          );
-        }
-
-        // Bekleyen sorguları Map'e ekliyoruz.
-        pendingRequests.set(requestKey, ws);
-
-        // Light node'a yönlendiriyoruz.
-        nodeWs.send(JSON.stringify(clientMessage));
-      } catch (err) {
-        console.error('Client mesajı parse edilemedi:', err);
-        ws.send(JSON.stringify({ error: 'Invalid JSON message' }));
+      if (nodeWs && nodeWs.readyState === WebSocket.OPEN) {
+        nodeWs.send(message);
       }
     });
 
-    // Bağlantı kapanınca pendingRequests'ten ilgili istekleri temizleyelim.
     ws.on('close', () => {
-      for (const [key, clientWs] of pendingRequests.entries()) {
-        if (clientWs === ws) {
-          pendingRequests.delete(key);
-        }
+      if (nodeWs) {
+        nodeWs.removeListener('message', handleNodeMessage);
       }
+    });
+
+    const intervalId = setInterval(async () => {
+      if (await isNodeRestarting())
+        ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+    }, 5000);
+
+    ws.on('close', () => {
+      clearInterval(intervalId);
     });
   });
 });
+
+connectToNode();
 
 server.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);
