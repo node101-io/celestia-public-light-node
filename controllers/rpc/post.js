@@ -1,6 +1,8 @@
 import path from 'path';
 import dotenv from 'dotenv';
 
+import { isNodeRestarting } from '../../utils/nodeStatus.js';
+
 dotenv.config({ path: path.resolve(import.meta.dirname, '../../.env') });
 
 const LOCAL_ENDPOINT_LIGHT_NODE = 'http://localhost:10102';
