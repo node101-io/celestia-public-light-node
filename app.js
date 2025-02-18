@@ -110,8 +110,7 @@ wss.on('connection', (ws, req) => {
         ws.send(data);
     };
 
-    if (nodeWs)
-      nodeWs.on('message', handleNodeMessage);
+    nodeWs.on('message', handleNodeMessage);
 
     ws.on('message', async (message) => {
       if (await isNodeRestarting())
@@ -123,9 +122,7 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => {
-      if (nodeWs) {
-        nodeWs.removeListener('message', handleNodeMessage);
-      }
+      nodeWs.removeListener('message', handleNodeMessage);
     });
 
     const intervalId = setInterval(async () => {
