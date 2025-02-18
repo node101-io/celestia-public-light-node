@@ -125,7 +125,7 @@ wss.on('connection', (ws, req) => {
     }
 
     const handleNodeMessage = (data) => {
-      ws.send(data);
+      ws.send(data.data);
     };
 
     nodeWs.addEventListener('message', handleNodeMessage);
