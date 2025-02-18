@@ -71,7 +71,11 @@ const clients = new Map(); // Connected clients
 
 const connectToNode = () => {
   try {
-    nodeWs = new WebSocket(LIGHT_NODE_ENDPOINT);
+    nodeWs = new WebSocket(LIGHT_NODE_ENDPOINT, {
+      headers: {
+        'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY,
+      }
+    });
 
     nodeWs.on('open', () => {
       console.log('Connected to light node');
@@ -103,35 +107,25 @@ const connectToNode = () => {
 connectToNode();
 
 wss.on('connection', (ws, req) => {
-  if (!req.headers['x-api-key']) {
+  if (!req.headers['x-api-key'])
     return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
-  }
 
   ApiKey.findApiKeysByFilters({ key: req.headers['x-api-key'] }, async (err, api_keys) => {
-    if (err || !api_keys) {
+    if (err || !api_keys)
       return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
-    }
 
     const clientId = Math.random().toString(36).substring(7);
     clients.set(clientId, ws);
 
-    if (await isNodeRestarting()) {
+    if (await isNodeRestarting())
       ws.send(JSON.stringify({ error: 'node_is_restarting' }));
-    }
 
     ws.on('message', async (message) => {
-      try {
-        if (await isNodeRestarting()) {
-          ws.send(JSON.stringify({ error: 'node_is_restarting' }));
-          return;
-        }
+      if (await isNodeRestarting())
+        return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
 
-        if (nodeWs && nodeWs.readyState === WebSocket.OPEN) {
-          nodeWs.send(message);
-        }
-      } catch (error) {
-        ws.send(JSON.stringify({ error: 'internal_server_error' }));
-      }
+      if (nodeWs && nodeWs.readyState === WebSocket.OPEN)
+        nodeWs.send(message);
     });
 
     ws.on('close', () => {
@@ -139,9 +133,8 @@ wss.on('connection', (ws, req) => {
     });
 
     const intervalId = setInterval(async () => {
-      if (await isNodeRestarting()) {
+      if (await isNodeRestarting())
         ws.send(JSON.stringify({ error: 'node_is_restarting' }));
-      }
     }, 5000);
 
     ws.on('close', () => {
