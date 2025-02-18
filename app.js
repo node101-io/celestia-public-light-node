@@ -79,28 +79,16 @@ let nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
 console.log('Attempting initial connection to light node...');
 
 nodeWs.addEventListener('open', () => {
-  console.log('✅ Successfully connected to light node', {
-    wsExists: !!nodeWs.ws,
-    readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
-  });
+  console.log('✅ Successfully connected to light node');
 });
 nodeWs.addEventListener('reconnect', () => {
-  console.log('🔄 Attempting to reconnect to light node...', {
-    wsExists: !!nodeWs.ws,
-    readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
-  });
+  console.log('🔄 Attempting to reconnect to light node...');
 });
 nodeWs.addEventListener('error', (error) => {
-  console.error('❌ Light node connection error:', error, {
-    wsExists: !!nodeWs.ws,
-    readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
-  });
+  console.error('❌ Light node connection error:', error);
 });
 nodeWs.addEventListener('close', () => {
-  console.log('❌ Disconnected from light node', {
-    wsExists: !!nodeWs.ws,
-    readyState: nodeWs.ws ? nodeWs.ws.readyState : 'no websocket'
-  });
+  console.log('❌ Disconnected from light node');
 });
 
 wss.on('connection', (ws, req) => {
