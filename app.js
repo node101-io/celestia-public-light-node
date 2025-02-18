@@ -66,7 +66,8 @@ app.post('/rpc',
 );
 
 ////////////////////////////////////////////////////////////////////////////
-// Her istemcinin sorguları için pending (bekleyen) sorguları saklamak üzere Map oluşturuyoruz.
+
+// İstemciden gelen pending sorguları tutmak için Map oluşturuyoruz.
 const pendingRequests = new Map();
 
 // ReconnectingWebSocket ile light node bağlantısı yapılıyor.
@@ -79,25 +80,33 @@ const nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
   }
 });
 
-// Merkezi dinleyici: nodeWs'den gelen tüm mesajları alıp, içindeki requestId'ye göre ilgili istemciye gönderecek.
+// Merkezi dinleyici: nodeWs'den gelen tüm mesajları alıp,
+// içindeki requestId veya id alanına göre ilgili istemciye gönderiyoruz.
 nodeWs.addEventListener('message', (event) => {
   try {
     const messageData = JSON.parse(event.data);
-    // Gelen mesajın formatı örn.: { requestId: "12345", result: { ... } }
-    const { requestId, result, error } = messageData;
-    
-    if (pendingRequests.has(requestId)) {
-      const clientWs = pendingRequests.get(requestId);
+    // Gelen mesaj örneğin: { "jsonrpc": "2.0", "result": { ... }, "id": 31 }
+    const requestKey = messageData.requestId || messageData.id;
+
+    if (!requestKey) {
+      console.warn('Gelen mesajda requestKey bulunamadı');
+      return;
+    }
+
+    if (pendingRequests.has(requestKey)) {
+      const clientWs = pendingRequests.get(requestKey);
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.send(
-          JSON.stringify({ requestId, result, error })
+          JSON.stringify({
+            requestId: requestKey, // veya "id" ismi de kullanılabilir
+            result: messageData.result,
+            error: messageData.error
+          })
         );
       }
-      pendingRequests.delete(requestId);
+      pendingRequests.delete(requestKey);
     } else {
-      console.warn(
-        `Gelen response için requestId bulunamadı: ${requestId}`
-      );
+      console.warn(`Gelen response için requestKey bulunamadı: ${requestKey}`);
     }
   } catch (err) {
     console.error('Gelen mesaj parse edilemedi:', err);
@@ -109,55 +118,56 @@ wss.on('connection', (ws, req) => {
   if (!req.headers['x-api-key'])
     return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
-  ApiKey.findApiKeysByFilters(
-    { key: req.headers['x-api-key'] },
-    async (err, api_keys) => {
-      if (err || !api_keys)
-        return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
+  ApiKey.findApiKeysByFilters({ key: req.headers['x-api-key'] }, async (err, api_keys) => {
+    if (err || !api_keys)
+      return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
+    if (await isNodeRestarting()) {
+      ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+    }
+
+    // İstemciden gelen mesajlarda, client'in kendi benzersiz requestId veya id göndereceğini varsayıyoruz.
+    ws.on('message', async (message) => {
       if (await isNodeRestarting()) {
-        ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+        return ws.send(
+          JSON.stringify({ error: 'node_is_restarting' })
+        );
       }
 
-      // İstemciden gelen mesajlarda, client kendi requestId'sini oluşturup göndereceğini farz ediyoruz.
-      ws.on('message', async (message) => {
-        if (await isNodeRestarting())
+      try {
+        const clientMessage = JSON.parse(message);
+        // Mesaj formatı örn: { "method": "blob.Subscribe", "params": [...], 
+        //                   "jsonrpc": "2.0", "id": 31, "requestId": 31 }
+        const requestKey = clientMessage.requestId || clientMessage.id;
+        if (!requestKey) {
           return ws.send(
-            JSON.stringify({ error: 'node_is_restarting' })
+            JSON.stringify({
+              error:
+                'Eksik identifier: her sorguya benzersiz bir requestId veya id ekleyin.'
+            })
           );
-
-        try {
-          const clientMessage = JSON.parse(message);
-          // clientMessage ör. format: { requestId: "12345", type: "some_query", payload: { ... } }
-          if (!clientMessage.requestId)
-            return ws.send(
-              JSON.stringify({
-                error: 'Eksik requestId: her sorguya benzersiz bir requestId ekleyin.'
-              })
-            );
-
-          // Bekleyen sorguları saklamak
-          pendingRequests.set(clientMessage.requestId, ws);
-
-          // Light node'a yönlendiriyoruz.  
-          // Örneğin, clientMessage doğrudan veya gerekirse dönüştürülerek gönderilebilir.
-          nodeWs.send(JSON.stringify(clientMessage));
-        } catch (err) {
-          console.error('Client mesajı parse edilemedi:', err);
-          ws.send(JSON.stringify({ error: 'Invalid JSON message' }));
         }
-      });
 
-      // Bağlantı kapanınca pendingRequests'ten de temizleyelim
-      ws.on('close', () => {
-        for (const [key, clientWs] of pendingRequests.entries()) {
-          if (clientWs === ws) {
-            pendingRequests.delete(key);
-          }
+        // Bekleyen sorguları Map'e ekliyoruz.
+        pendingRequests.set(requestKey, ws);
+
+        // Light node'a yönlendiriyoruz.
+        nodeWs.send(JSON.stringify(clientMessage));
+      } catch (err) {
+        console.error('Client mesajı parse edilemedi:', err);
+        ws.send(JSON.stringify({ error: 'Invalid JSON message' }));
+      }
+    });
+
+    // Bağlantı kapanınca pendingRequests'ten ilgili istekleri temizleyelim.
+    ws.on('close', () => {
+      for (const [key, clientWs] of pendingRequests.entries()) {
+        if (clientWs === ws) {
+          pendingRequests.delete(key);
         }
-      });
-    }
-  );
+      }
+    });
+  });
 });
 
 server.listen(PORT, () => {
