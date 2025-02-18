@@ -92,6 +92,10 @@ const connectToNode = () => {
 
     nodeWs.on('close', () => {
       console.log('Disconnected from light node, attempting to reconnect...');
+      wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN)
+          client.close(1000, JSON.stringify({ error: 'node_disconnected' }));
+      });
       setTimeout(connectToNode, 5000);
     });
   } catch (error) {
@@ -109,38 +113,25 @@ wss.on('connection', (ws, req) => {
       return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
     if (await isNodeRestarting())
-      ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+      return ws.close(1000, JSON.stringify({ error: 'node_is_restarting' }));
 
     const handleNodeMessage = (data) => {
-      if (ws.readyState === WebSocket.OPEN)
-        ws.send(data);
+      if (ws.readyState === WebSocket.OPEN) ws.send(data);
     };
 
-    if (nodeWs)
-      nodeWs.on('message', handleNodeMessage);
+    if (nodeWs) nodeWs.on('message', handleNodeMessage);
 
     ws.on('message', async (message) => {
       if (await isNodeRestarting())
-        return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+        return ws.close(1000, JSON.stringify({ error: 'node_is_restarting' }));
 
-      if (nodeWs && nodeWs.readyState === WebSocket.OPEN) {
+      if (nodeWs && nodeWs.readyState === WebSocket.OPEN)
         nodeWs.send(message);
-      }
     });
 
     ws.on('close', () => {
-      if (nodeWs) {
+      if (nodeWs)
         nodeWs.removeListener('message', handleNodeMessage);
-      }
-    });
-
-    const intervalId = setInterval(async () => {
-      if (await isNodeRestarting())
-        ws.send(JSON.stringify({ error: 'node_is_restarting' }));
-    }, 5000);
-
-    ws.on('close', () => {
-      clearInterval(intervalId);
     });
   });
 });
