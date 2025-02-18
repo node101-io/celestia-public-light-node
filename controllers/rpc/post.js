@@ -2,10 +2,9 @@ import path from 'path';
 import dotenv from 'dotenv';
 
 import { isNodeRestarting } from '../../utils/nodeStatus.js';
+import { LIGHT_NODE_ENDPOINT } from '../../app.js';
 
 dotenv.config({ path: path.resolve(import.meta.dirname, '../../.env') });
-
-const LOCAL_ENDPOINT_LIGHT_NODE = 'http://localhost:10102';
 
 if (!process.env.CELESTIA_AUTH_KEY)
   console.error('CELESTIA_AUTH_KEY is not set!');
@@ -16,7 +15,7 @@ export default async (req, res) => {
   if (await isNodeRestarting())
     return res.json({ error: 'node_is_restarting' });
 
-  fetch(LOCAL_ENDPOINT_LIGHT_NODE, {
+  fetch(LIGHT_NODE_ENDPOINT, {
     method: req.method,
     headers: {
       'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY,
