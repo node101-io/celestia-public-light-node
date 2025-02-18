@@ -80,11 +80,12 @@ const nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
 
 nodeWs.addEventListener('open', () => {
   console.log('✅ Successfully connected to light node');
-
+  
   activeConnections.forEach((handler, ws) => {
-    console.log(ws.readyState, WebSocket.OPEN);
-    if (ws.readyState === WebSocket.OPEN)
+    if (ws.readyState === WebSocket.OPEN) {
+      nodeWs.removeEventListener('message', handler);
       nodeWs.addEventListener('message', handler);
+    };
   });
 });
 
