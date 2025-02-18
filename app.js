@@ -67,9 +67,15 @@ app.post('/rpc',
 ////////////////////////////////////////////////////////////////////////////
 
 let nodeWs = null;
-let connectedClients = new Set(); // Bağlı client'ları takip etmek için
+let connectedClients = new Set();
 
 const setupNodeMessageHandler = (ws, handleNodeMessage) => {
+  // Önce varolan handler'ı kaldır
+  if (nodeWs) {
+    nodeWs.removeListener("message", handleNodeMessage);
+  }
+
+  // Sonra yeni handler'ı ekle
   if (nodeWs && nodeWs.readyState === WebSocket.OPEN) {
     nodeWs.on("message", handleNodeMessage);
   }
@@ -106,13 +112,6 @@ const connectToNode = () => {
 
     nodeWs.on("close", () => {
       console.log("Disconnected from light node, attempting to reconnect...");
-      // Node kapandığında tüm client'lara bilgi ver
-      connectedClients.forEach((clientData) => {
-        const { ws } = clientData;
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ error: "node_disconnected" }));
-        }
-      });
       setTimeout(connectToNode, 5000);
     });
   } catch (error) {
@@ -154,8 +153,6 @@ wss.on("connection", (ws, req) => {
 
         if (nodeWs && nodeWs.readyState === WebSocket.OPEN) {
           nodeWs.send(message);
-        } else {
-          ws.send(JSON.stringify({ error: "node_not_connected" }));
         }
       });
 
@@ -167,18 +164,8 @@ wss.on("connection", (ws, req) => {
         connectedClients.delete(clientData);
       });
 
-      const intervalId = setInterval(async () => {
-        if (await isNodeRestarting()) {
-          ws.send(JSON.stringify({ error: "node_is_restarting" }));
-        } else if (nodeWs && nodeWs.readyState === WebSocket.OPEN) {
-          // Node bağlıysa ve handler yoksa, yeniden kur
-          setupNodeMessageHandler(ws, handleNodeMessage);
-        }
-      }, 5000);
-
-      ws.on("close", () => {
-        clearInterval(intervalId);
-      });
+      // Node bağlantısını kontrol etmek için interval'ı kaldırdık
+      // çünkü bu da duplicate handler'lara neden olabilir
     }
   );
 });
