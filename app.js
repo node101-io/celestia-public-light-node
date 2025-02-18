@@ -82,6 +82,7 @@ nodeWs.addEventListener('open', () => {
   console.log('✅ Successfully connected to light node');
 
   activeConnections.forEach((handler, ws) => {
+    console.log(ws.readyState, WebSocket.OPEN);
     if (ws.readyState === WebSocket.OPEN)
       nodeWs.addEventListener('message', handler);
   });
