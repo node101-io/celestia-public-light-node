@@ -106,7 +106,7 @@ wss.on('connection', (ws, req) => {
     if (await isNodeRestarting())
       ws.send(JSON.stringify({ error: 'node_is_restarting' }));
 
-    nodeWs.addEventListener('message', () => ws.send(data.data));
+    nodeWs.addEventListener('message', data => ws.send(data.data));
 
     ws.on('message', async (message) => {      
       if (await isNodeRestarting())
@@ -116,7 +116,7 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => {
-      nodeWs.removeEventListener('message', () => ws.send(data.data));
+      nodeWs.removeEventListener('message', data => ws.send(data.data));
     });
   });
 });
