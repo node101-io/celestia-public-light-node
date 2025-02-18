@@ -67,6 +67,8 @@ app.post('/rpc',
 
 ////////////////////////////////////////////////////////////////////////////
 
+const activeConnections = new Map(); // WebSocket bağlantılarını ve handler'ları saklamak için
+
 const nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
   WebSocket: WebSocket,
   WebSocketOptions: {
@@ -76,14 +78,13 @@ const nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
   }
 });
 
-nodeWs.addEventListener('close', () => {
-  console.log('❌ Disconnected from light node');
-});
-nodeWs.addEventListener('error', (error) => {
-  console.error('❌ Light node connection error:', error);
-});
 nodeWs.addEventListener('open', () => {
   console.log('✅ Successfully connected to light node');
+
+  activeConnections.forEach((handler, ws) => {
+    if (ws.readyState === WebSocket.OPEN)
+      nodeWs.addEventListener('message', handler);
+  });
 });
 
 wss.on('connection', (ws, req) => {  
@@ -102,6 +103,7 @@ wss.on('connection', (ws, req) => {
     };
 
     nodeWs.addEventListener('message', handleNodeMessage);
+    activeConnections.set(ws, handleNodeMessage); // Bağlantıyı ve handler'ı sakla
 
     ws.on('message', async (message) => {      
       if (await isNodeRestarting())
@@ -112,6 +114,7 @@ wss.on('connection', (ws, req) => {
 
     ws.on('close', () => {
       nodeWs.removeEventListener('message', handleNodeMessage);
+      activeConnections.delete(ws); // Bağlantı kapandığında Map'ten kaldır
     });
   });
 });
