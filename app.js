@@ -68,6 +68,7 @@ app.post('/rpc',
 ////////////////////////////////////////////////////////////////////////////
 
 let nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
+  WebSocket: WebSocket,
   WebSocketOptions: {
     headers: {
       'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY,
