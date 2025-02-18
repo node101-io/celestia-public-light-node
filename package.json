@@ -13,7 +13,6 @@
     "@cosmjs/crypto": "^0.32.4",
     "@cosmjs/proto-signing": "^0.32.4",
     "@cosmjs/stargate": "^0.32.4",
-    "@opensumi/reconnecting-websocket": "^4.4.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
@@ -21,7 +20,6 @@
     "mongoose": "^8.9.6",
     "uuid": "^11.0.5",
     "validator": "^13.12.0",
-    "websocket-reconnect": "^1.0.10",
     "ws": "^8.18.0"
   },
   "devDependencies": {

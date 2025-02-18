@@ -25,7 +25,7 @@ await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/cel
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, path: '/ws' });
 
 const PORT = config.port || 3000;
 export const LIGHT_NODE_ENDPOINT = 'http://localhost:10102';
