@@ -84,9 +84,13 @@ const connectToNode = () => {
 
     nodeWs.on('open', () => {
       console.log('Connected to light node');
-      // Node bağlantısı yenilendiğinde tüm aktif listener'ları yeni nodeWs'ye bağla
+      // Node bağlantısı yenilendiğinde tüm aktif listener'ları yeniden bağla
+      // ve subscription mesajlarını tekrar gönder
       activeListeners.forEach(listener => {
         nodeWs.on('message', listener.handleNodeMessage);
+        if (listener.lastSubscriptionMessage) {
+          nodeWs.send(listener.lastSubscriptionMessage);
+        }
       });
     });
 
@@ -121,8 +125,12 @@ wss.on('connection', (ws, req) => {
         ws.send(data);
     };
 
-    // Listener'ı active listeners array'ine ekle
-    const listenerInfo = { ws, handleNodeMessage };
+    // Listener bilgisini genişletiyoruz, son subscription mesajını da tutacak
+    const listenerInfo = { 
+      ws, 
+      handleNodeMessage,
+      lastSubscriptionMessage: null 
+    };
     activeListeners.push(listenerInfo);
 
     if (nodeWs)
@@ -131,6 +139,21 @@ wss.on('connection', (ws, req) => {
     ws.on('message', async (message) => {
       if (await isNodeRestarting())
         return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+
+      // Gelen mesaj bir subscription ise kaydedelim
+      const msgStr = message.toString();
+      try {
+        const msgObj = JSON.parse(msgStr);
+        if (msgObj.method === 'blob.Subscribe') {
+          // Bu client'ın listener bilgisini bulup subscription mesajını kaydedelim
+          const listener = activeListeners.find(l => l.ws === ws);
+          if (listener) {
+            listener.lastSubscriptionMessage = msgStr;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse message:', e);
+      }
 
       if (nodeWs && nodeWs.readyState === WebSocket.OPEN) {
         nodeWs.send(message);
