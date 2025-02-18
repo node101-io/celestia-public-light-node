@@ -125,12 +125,7 @@ wss.on('connection', (ws, req) => {
     }
 
     const handleNodeMessage = (data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        console.log('📤 Forwarding light node response to client:', data.toString().substring(0, 100) + '...');
-        ws.send(data);
-      } else {
-        console.log('⚠️ Cannot forward message: Client connection not open');
-      }
+      ws.send(data);
     };
 
     nodeWs.addEventListener('message', handleNodeMessage);
