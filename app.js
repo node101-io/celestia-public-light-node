@@ -67,11 +67,9 @@ app.post('/rpc',
 ////////////////////////////////////////////////////////////////////////////
 
 let nodeWs = null;
-const clients = new Map();
 
 const connectToNode = () => {
   try {
-    // Eğer mevcut bir bağlantı varsa, önce onu temizleyelim
     if (nodeWs) {
       nodeWs.removeAllListeners();
       nodeWs.terminate();
@@ -85,42 +83,16 @@ const connectToNode = () => {
 
     nodeWs.on('open', () => {
       console.log('Connected to light node');
-
-      // Node bağlantısı yeniden kurulduğunda, tüm client'ları yeniden subscribe edelim
-      clients.forEach((client, clientId) => {
-        if (client.readyState === WebSocket.OPEN) {
-          // Opsiyonel: Client'a node'un yeniden bağlandığını bildirebiliriz
-          client.send(JSON.stringify({ type: 'system', message: 'node_reconnected' }));
-
-          // Eğer client'ın özel bir subscription mesajı varsa,
-          // burada node'a tekrar gönderebiliriz
-          // Örnek: nodeWs.send(clients.get(clientId).subscriptionMessage);
-        }
-      });
-    });
-
-    nodeWs.on('message', (data) => {
-      clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(data);
-        }
-      });
-    });
-
-    nodeWs.on('close', () => {
-      console.log('Disconnected from light node, attempting to reconnect...');
-      // Tüm client'lara node'un kapandığını bildirebiliriz
-      clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({ type: 'system', message: 'node_disconnected' }));
-        }
-      });
-      setTimeout(connectToNode, 5000);
     });
 
     nodeWs.on('error', (error) => {
       console.error('Light node connection error:', error);
       nodeWs.close();
+    });
+
+    nodeWs.on('close', () => {
+      console.log('Disconnected from light node, attempting to reconnect...');
+      setTimeout(connectToNode, 5000);
     });
   } catch (error) {
     console.error('Failed to connect to light node:', error);
@@ -136,28 +108,35 @@ wss.on('connection', (ws, req) => {
     if (err || !api_keys)
       return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
-    const clientId = Math.random().toString(36).substring(7);
-    clients.set(clientId, ws);
-
-    // Client'ın subscription mesajını saklayabiliriz
-    // ws.subscriptionMessage = null;
-
     if (await isNodeRestarting())
       ws.send(JSON.stringify({ error: 'node_is_restarting' }));
+
+    // Node'dan gelen mesajları client'a iletmek için listener
+    const handleNodeMessage = (data) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
+      }
+    };
+
+    // Node bağlantısı varsa, mesaj listener'ını ekle
+    if (nodeWs) {
+      nodeWs.on('message', handleNodeMessage);
+    }
 
     ws.on('message', async (message) => {
       if (await isNodeRestarting())
         return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
 
       if (nodeWs && nodeWs.readyState === WebSocket.OPEN) {
-        // Subscription mesajını saklayabiliriz
-        // ws.subscriptionMessage = message;
         nodeWs.send(message);
       }
     });
 
+    // Client bağlantısı kapandığında cleanup
     ws.on('close', () => {
-      clients.delete(clientId);
+      if (nodeWs) {
+        nodeWs.removeListener('message', handleNodeMessage);
+      }
     });
 
     const intervalId = setInterval(async () => {
