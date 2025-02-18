@@ -66,57 +66,98 @@ app.post('/rpc',
 );
 
 ////////////////////////////////////////////////////////////////////////////
+// İstemci bazında ayrı handler yönetimi
 
-const activeConnections = new Map(); // WebSocket bağlantılarını ve handler'ları saklamak için
+// Her istemci için handler referanslarını saklamak için Map
+const activeConnections = new Map();
 
-const nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
-  WebSocket: WebSocket,
-  WebSocketOptions: {
-    headers: {
-      'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY,
+// Her istemci için özel handler oluşturma fonksiyonu
+function createClientHandler(clientWs) {
+  return function handleNodeMessage(event) {
+    try {
+      const messageData = JSON.parse(event.data);
+      // Burada mesaj içeriğine göre filtreleme yapabilirsiniz.
+      // Örneğin, mesajın bir requestId'si varsa ve bu client'a aitse,
+      // sadece o durumda mesajı iletebilirsiniz.
+      // Aşağıdaki örnekte tüm gelen mesajı ilgili client'a gönderiyoruz.
+      if (clientWs.readyState === WebSocket.OPEN) {
+        clientWs.send(JSON.stringify(messageData));
+      }
+    } catch (err) {
+      console.error('Hata: İstemci mesajı işlenirken:', err);
     }
-  }
-});
+  };
+}
 
-nodeWs.addEventListener('open', () => {
-  console.log('✅ Successfully connected to light node');
-  
-  activeConnections.forEach((handler, ws) => {
-    if (ws.readyState === WebSocket.OPEN) {
-      nodeWs.removeEventListener('message', handler);
-      nodeWs.addEventListener('message', handler);
-    };
+// Light node ile reconnect olduğunda, tüm aktif client handler'larını yeniden ekliyoruz
+nodeWsSetup();
+
+function nodeWsSetup() {
+  const nodeWs = new ReconnectingWebSocket(LIGHT_NODE_ENDPOINT, [], {
+    WebSocket: WebSocket,
+    WebSocketOptions: {
+      headers: {
+        'Authorization': 'Bearer ' + process.env.CELESTIA_AUTH_KEY
+      }
+    }
   });
-});
 
-wss.on('connection', (ws, req) => {  
+  nodeWs.addEventListener('open', () => {
+    console.log('✅ Successfully connected to light node');
+    // Bağlı tüm istemciler için handler'ları yeniden ekle
+    activeConnections.forEach((handler, clientWs) => {
+      if (clientWs.readyState === WebSocket.OPEN) {
+        // Önce eski handler'ı kaldırıp, aynı handler'ı yeniden ekleyelim
+        nodeWs.removeEventListener('message', handler);
+        nodeWs.addEventListener('message', handler);
+      }
+    });
+  });
+
+  // Gerekirse nodeWs üzerinde hata ya da reconnect event'lerini de dinleyebilirsiniz
+
+  // İstemciden gelen mesajları nodeWs'e iletirken kullanılacak referansa erişmek için
+  // nodeWs örneğini dışa aktarabilir veya active reconnection kontrolü yapabilirsiniz.
+  return nodeWs;
+}
+
+// nodeWs değişkenini dışarıda görmek için:
+const nodeWs = nodeWsSetup();
+
+wss.on('connection', (ws, req) => {
+  // API key kontrolü
   if (!req.headers['x-api-key'])
     return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
-  ApiKey.findApiKeysByFilters({ key: req.headers['x-api-key'] }, async (err, api_keys) => {
+  // API key doğrulamasını gerçekleştirme
+  ApiKey.findApiKeysByFilters({ key: req.headers['x-api-key'] }, async (
+    err,
+    api_keys
+  ) => {
     if (err || !api_keys)
       return ws.close(1000, JSON.stringify({ error: 'unauthorized' }));
 
     if (await isNodeRestarting())
       ws.send(JSON.stringify({ error: 'node_is_restarting' }));
 
-    function handleNodeMessage(data) {
-      ws.send(data.data);
-    };
+    // Client'e özel mesaj handler'ını oluştur
+    const clientHandler = createClientHandler(ws);
+    nodeWs.addEventListener('message', clientHandler);
+    activeConnections.set(ws, clientHandler);
 
-    nodeWs.addEventListener('message', handleNodeMessage);
-    activeConnections.set(ws, handleNodeMessage); // Bağlantıyı ve handler'ı sakla
-
-    ws.on('message', async (message) => {      
+    // İstemciden gelen mesajları light node'a gönder
+    ws.on('message', async (message) => {
       if (await isNodeRestarting())
         return ws.send(JSON.stringify({ error: 'node_is_restarting' }));
 
+      // Gerekirse burada client mesajı üzerinde ön işleme yapabilirsiniz
       nodeWs.send(message);
     });
 
+    // Client bağlantısı kapandığında handler'ı kaldır ve Map'ten temizle
     ws.on('close', () => {
-      nodeWs.removeEventListener('message', handleNodeMessage);
-      activeConnections.delete(ws); // Bağlantı kapandığında Map'ten kaldır
+      nodeWs.removeEventListener('message', clientHandler);
+      activeConnections.delete(ws);
     });
   });
 });
